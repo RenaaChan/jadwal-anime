@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anime Musim Ini</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #fefefe;
+      color: #333;
+    }
+    header {
+      background: #fff;
+      padding: 10px;
+      box-shadow: 0 2px 4px #ccc;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    input, select {
+      padding: 8px;
+      margin: 5px 5px 5px 0;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    .anime-list, .anime-detail {
+      padding: 10px;
+    }
+    .anime-item {
+      display: flex;
+      gap: 10px;
+      background: #fff;
+      margin-bottom: 10px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
+    .anime-item img {
+      width: 100px;
+      object-fit: cover;
+    }
+    .anime-info {
+      flex: 1;
+      padding: 5px;
+    }
+    .anime-info h3 {
+      margin: 0;
+    }
+    .genre {
+      font-size: 0.9em;
+      color: #555;
+    }
+    .rating {
+      color: #f39c12;
+    }
+    .anime-detail {
+      display: none;
+    }
+    .detail-title {
+      font-size: 1.5em;
+      margin-bottom: 10px;
+    }
+    .back-btn {
+      margin-top: 10px;
+      padding: 10px;
+      background: #eee;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .character-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .character-item {
+      width: 48%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .character-item img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .character-name {
+      padding: 5px;
+      font-size: 0.9em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <input type="text" id="search" placeholder="Cari anime...">
+    <select id="seasonSelect">
+      <option value="winter">Winter</option>
+      <option value="spring">Spring</option>
+      <option value="summer">Summer</option>
+      <option value="fall">Fall</option>
+    </select>
+    <select id="yearSelect"></select>
+  </header>
+
+  <div class="anime-list" id="animeList"></div>
+
+  <div class="anime-detail" id="animeDetail"></div>
+
+  <script>
+    const searchInput = document.getElementById("search");
+    const seasonSelect = document.getElementById("seasonSelect");
+    const yearSelect = document.getElementById("yearSelect");
+    const animeList = document.getElementById("animeList");
+    const animeDetail = document.getElementById("animeDetail");
+
+    // Isi tahun
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    for (let y = currentYear; y >= 2000; y--) {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      yearSelect.appendChild(opt);
+    }
+
+    // Default musim ini
+    const getCurrentSeason = () => {
+      if (currentMonth < 3) return "winter";
+      if (currentMonth < 6) return "spring";
+      if (currentMonth < 9) return "summer";
+      return "fall";
+    };
+
+    seasonSelect.value = getCurrentSeason();
+    yearSelect.value = currentYear;
+
+    const fetchAnime = async () => {
+      const season = seasonSelect.value;
+      const year = yearSelect.value;
+      const res = await fetch(`https://api.jikan.moe/v4/seasons/${year}/${season}`);
+      const data = await res.json();
+      renderList(data.data);
+    };
+
+    const renderList = (anime) => {
+      animeList.innerHTML = "";
+      animeDetail.style.display = "none";
+      animeList.style.display = "block";
+
+      anime.forEach(item => {
+        const title = item.title;
+        const img = item.images.jpg.image_url;
+        const score = item.score || "N/A";
+        const eps = item.episodes || "?";
+        const status = item.status || "Unknown";
+        const genres = item.genres.map(g => g.name).join(", ");
+        const div = document.createElement("div");
+        div.className = "anime-item";
+        div.innerHTML = `
+          <img src="${img}" alt="${title}">
+          <div class="anime-info">
+            <h3>${title}</h3>
+            <div class="rating">⭐ ${score}</div>
+            <div>Episode: ${eps}</div>
+            <div>Status: ${status}</div>
+            <div class="genre">${genres}</div>
+          </div>
+        `;
+        div.onclick = () => showDetail(item.mal_id);
+        animeList.appendChild(div);
+      });
+    };
+
+    const showDetail = async (id) => {
+      animeList.style.display = "none";
+      animeDetail.style.display = "block";
+
+      const [animeRes, characterRes] = await Promise.all([
+        fetch(`https://api.jikan.moe/v4/anime/${id}/full`).then(r => r.json()),
+        fetch(`https://api.jikan.moe/v4/anime/${id}/characters`).then(r => r.json())
+      ]);
+
+      const anime = animeRes.data;
+      const characters = characterRes.data.slice(0, 8); // Max 8 character
+
+      const genres = anime.genres.map(g => g.name).join(", ");
+      const vaChar = characters.map(c => {
+        const name = c.character.name;
+        const charImg = c.character.images.jpg.image_url;
+        const va = c.voice_actors?.find(va => va.language === "Japanese");
+        const vaName = va ? va.person.name : "Unknown";
+        const vaImg = va ? va.person.images.jpg.image_url : "";
+        return `
+          <div class="character-item">
+            <img src="${charImg}" alt="${name}">
+            <div class="character-name">${name}<br><small>VA: ${vaName}</small></div>
+          </div>
+        `;
+      }).join("");
+
+      animeDetail.innerHTML = `
+        <button class="back-btn" onclick="animeDetail.style.display='none';animeList.style.display='block'">⬅️ Kembali</button>
+        <h2 class="detail-title">${anime.title}</h2>
+        <img src="${anime.images.jpg.large_image_url}" width="100%" />
+        <p><strong>Rating:</strong> ⭐ ${anime.score || "N/A"}</p>
+        <p><strong>Episode:</strong> ${anime.episodes || "?"}</p>
+        <p><strong>Status:</strong> ${anime.status}</p>
+        <p><strong>Genre:</strong> ${genres}</p>
+        <p><strong>Sinopsis:</strong> ${anime.synopsis || "-"}</p>
+        <h3>Karakter & Pengisi Suara</h3>
+        <div class="character-grid">${vaChar}</div>
+      `;
+    };
+
+    searchInput.addEventListener("input", () => {
+      const keyword = searchInput.value.toLowerCase();
+      const items = document.querySelectorAll(".anime-item");
+      items.forEach(item => {
+        const title = item.querySelector("h3").textContent.toLowerCase();
+        item.style.display = title.includes(keyword) ? "flex" : "none";
+      });
+    });
+
+    seasonSelect.addEventListener("change", fetchAnime);
+    yearSelect.addEventListener("change", fetchAnime);
+
+    fetchAnime();
+  </script>
+</body>
+  </html>
