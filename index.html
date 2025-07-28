@@ -1,9 +1,10 @@
+<!-- Simpan ini sebagai index.html lalu buka di browser -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>jadwal anime</title>
+  <title>Jadwal Anime</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,6 +13,7 @@
       background: #fefefe;
       color: #333;
     }
+
     header {
       background: #fff;
       padding: 10px;
@@ -37,6 +39,7 @@
     .filters {
       display: flex;
       gap: 10px;
+      flex-wrap: wrap;
     }
 
     .filters select {
@@ -150,6 +153,14 @@
           <option value="fall">Fall</option>
         </select>
         <select id="yearSelect"></select>
+        <select id="typeSelect">
+          <option value="all">Semua</option>
+          <option value="TV">TV</option>
+          <option value="ONA">ONA</option>
+          <option value="Movie">Movie</option>
+          <option value="OVA">OVA</option>
+          <option value="Special">Special</option>
+        </select>
       </div>
     </div>
   </header>
@@ -161,6 +172,7 @@
     const searchInput = document.getElementById("search");
     const seasonSelect = document.getElementById("seasonSelect");
     const yearSelect = document.getElementById("yearSelect");
+    const typeSelect = document.getElementById("typeSelect");
     const animeList = document.getElementById("animeList");
     const animeDetail = document.getElementById("animeDetail");
 
@@ -194,9 +206,12 @@
     const fetchAnime = async () => {
       const season = seasonSelect.value;
       const year = yearSelect.value;
+      const typeFilter = typeSelect.value;
+
       const res = await fetch(`https://api.jikan.moe/v4/seasons/${year}/${season}`);
       const data = await res.json();
-      renderList(data.data);
+      const filtered = typeFilter === "all" ? data.data : data.data.filter(a => a.type === typeFilter);
+      renderList(filtered);
     };
 
     const renderList = (anime) => {
@@ -208,19 +223,20 @@
         const title = item.title;
         const img = item.images.jpg.image_url;
         const score = item.score || "N/A";
-        const eps = item.episodes || "?";
+        const totalEp = item.episodes || "?";
         const statusLabel = mapStatus(item.status);
         const genres = item.genres.map(g => g.name).join(", ");
+        const type = item.type || "Unknown";
 
         const div = document.createElement("div");
         div.className = "anime-item";
         div.innerHTML = `
           <img src="${img}" alt="${title}">
           <div class="anime-info">
-            <div class="status-badge">${statusLabel}</div>
+            <div class="status-badge">${statusLabel} • ${type}</div>
             <h3>${title}</h3>
             <div class="rating">⭐ ${score}</div>
-            <div>Episode: ${eps}</div>
+            <div>Episode: ${totalEp}</div>
             <div class="genre">${genres}</div>
           </div>
         `;
@@ -243,15 +259,25 @@
 
       const genres = anime.genres.map(g => g.name).join(", ");
       const studios = anime.studios.map(s => s.name).join(", ") || "Unknown";
+      const airingDate = anime.aired?.from ? new Date(anime.aired.from).toLocaleDateString() : "-";
+      const broadcast = anime.broadcast || {};
+      const day = broadcast.day || "-";
+      const time = broadcast.time || "-";
+
       const vaChar = characters.map(c => {
         const name = c.character.name;
         const charImg = c.character.images.jpg.image_url;
         const va = c.voice_actors?.find(va => va.language === "Japanese");
         const vaName = va ? va.person.name : "Unknown";
+        const vaImg = va ? va.person.images.jpg.image_url : "";
         return `
           <div class="character-item">
             <img src="${charImg}" alt="${name}">
-            <div class="character-name">${name}<br><small>VA: ${vaName}</small></div>
+            <div class="character-name">
+              ${name}<br>
+              <img src="${vaImg}" alt="${vaName}" style="width:30px;height:30px;border-radius:50%;"><br>
+              <small>VA: ${vaName}</small>
+            </div>
           </div>
         `;
       }).join("");
@@ -265,6 +291,9 @@
         <p><strong>Status:</strong> ${mapStatus(anime.status)}</p>
         <p><strong>Studio:</strong> ${studios}</p>
         <p><strong>Genre:</strong> ${genres}</p>
+        <p><strong>Tanggal Rilis:</strong> ${airingDate}</p>
+        <p><strong>Hari Tayang:</strong> ${day}</p>
+        <p><strong>Jam Tayang:</strong> ${time}</p>
         <p><strong>Sinopsis:</strong> ${anime.synopsis || "-"}</p>
         <h3>Karakter & Pengisi Suara</h3>
         <div class="character-grid">${vaChar}</div>
@@ -282,25 +311,27 @@
 
     seasonSelect.addEventListener("change", fetchAnime);
     yearSelect.addEventListener("change", fetchAnime);
+    typeSelect.addEventListener("change", fetchAnime);
 
     fetchAnime();
-// Tambahan: auto cek musim & tahun setiap jam
-let lastSeason = getCurrentSeason();
-let lastYear = currentYear;
 
-setInterval(() => {
-  const now = new Date();
-  const newSeason = getCurrentSeason();
-  const newYear = now.getFullYear();
+    // Update otomatis jika ganti musim/tahun
+    let lastSeason = getCurrentSeason();
+    let lastYear = currentYear;
 
-  if (newSeason !== lastSeason || newYear !== lastYear) {
-    seasonSelect.value = newSeason;
-    yearSelect.value = newYear;
-    fetchAnime();
-    lastSeason = newSeason;
-    lastYear = newYear;
-  }
-}, 60 * 60 * 1000);
+    setInterval(() => {
+      const now = new Date();
+      const newSeason = getCurrentSeason();
+      const newYear = now.getFullYear();
+
+      if (newSeason !== lastSeason || newYear !== lastYear) {
+        seasonSelect.value = newSeason;
+        yearSelect.value = newYear;
+        fetchAnime();
+        lastSeason = newSeason;
+        lastYear = newYear;
+      }
+    }, 60 * 60 * 1000);
   </script>
 </body>
-</html>
+  </html>
